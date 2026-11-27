@@ -1548,8 +1548,13 @@ function App() {
   }
 
   if (publicLesson) {
+    const inTgPublic = isInsideTelegram();
     return (
-      <main className="app-shell" style={{ height: "100vh", overflow: "hidden" }}>
+      <main
+        className={`app-shell app-shell-public ${inTgPublic ? "in-telegram" : ""}`}
+        data-in-telegram={inTgPublic ? "true" : "false"}
+        style={{ height: "100dvh", overflow: "hidden", padding: 0 }}
+      >
         <TelegramPreview
           courseTitle={publicLesson.course_title || "Course"}
           lessonTitle={publicLesson.title || "Lesson"}
