@@ -22,7 +22,15 @@ class Database:
             conninfo=database_url,
             min_size=1,
             max_size=5,
-            kwargs={"row_factory": dict_row},
+            max_idle=240,
+            check=ConnectionPool.check_connection,
+            kwargs={
+                "row_factory": dict_row,
+                "keepalives": 1,
+                "keepalives_idle": 60,
+                "keepalives_interval": 10,
+                "keepalives_count": 5,
+            },
             open=False,
         )
 
