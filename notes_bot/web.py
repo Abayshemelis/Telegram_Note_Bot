@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import hashlib
 import hmac
 import html
@@ -218,6 +219,15 @@ class AttachmentInput(BaseModel):
     mime_type: str = Field(min_length=1, max_length=100)
     file_size: int = Field(default=0, ge=0)
     telegram_file_id: str = Field(min_length=1)
+
+
+class ImageUploadInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lesson_id: int | None = None
+    file_name: str = Field(default="pasted-image.png", min_length=1, max_length=255)
+    mime_type: str = Field(min_length=1, max_length=100)
+    data_base64: str = Field(min_length=1, max_length=8_000_000)
 
 
 class AIGenerationInput(BaseModel):
@@ -1431,6 +1441,61 @@ def create_app(
         if not deleted:
             raise HTTPException(status_code=404, detail="Attachment not found.")
         return {"status": "deleted"}
+
+    # ------------------------------------------------------------------
+    # Inline lesson images (paste / upload)
+    # ------------------------------------------------------------------
+
+    @app.post("/api/images", status_code=201)
+    async def upload_lesson_image(
+        payload: ImageUploadInput,
+        admin: dict[str, Any] = Depends(admin_user),
+    ) -> dict[str, Any]:
+        allowed_mimes = {
+            "image/png",
+            "image/jpeg",
+            "image/jpg",
+            "image/webp",
+            "image/gif",
+        }
+        mime = payload.mime_type.strip().lower()
+        if mime == "image/jpg":
+            mime = "image/jpeg"
+        if mime not in allowed_mimes:
+            raise HTTPException(
+                status_code=400,
+                detail="Unsupported image format. Use PNG, JPEG, WebP, or GIF.",
+            )
+        raw_b64 = payload.data_base64.strip()
+        if "," in raw_b64 and raw_b64.startswith("data:"):
+            raw_b64 = raw_b64.split(",", 1)[1]
+        try:
+            image_bytes = base64.b64decode(raw_b64, validate=True)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Invalid base64 image data.") from exc
+        if not image_bytes or len(image_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(
+                status_code=400,
+                detail="Image must be between 1 byte and 5 MB.",
+            )
+        return await db_call(
+            "miniapp_create_image",
+            payload.lesson_id,
+            payload.file_name.strip()[:255] or "pasted-image.png",
+            mime,
+            image_bytes,
+        )
+
+    @app.get("/api/images/{image_id}")
+    async def get_lesson_image(image_id: int) -> Response:
+        image = await db_call("miniapp_get_image", image_id)
+        if image is None:
+            raise HTTPException(status_code=404, detail="Image not found.")
+        return Response(
+            content=image["data"],
+            media_type=image["mime_type"],
+            headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
 
     # ------------------------------------------------------------------
     # AI generations

@@ -271,6 +271,7 @@ def extract_summary(content: str, max_length: int = 240) -> str:
             or line.startswith("==")
             or line.startswith("--")
             or line.startswith("§§")
+            or line.startswith("![")
         ):
             continue
         cleaned = re.sub(r"[*_`#>\[\]]", "", line).strip()

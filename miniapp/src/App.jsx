@@ -183,6 +183,7 @@ function App() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(() => {
     return Boolean(window.Telegram?.WebApp?.isFullscreen);
@@ -1587,6 +1588,125 @@ function App() {
   const isFullWidthView = ["courses", "calendar", "publishing", "settings"].includes(viewMode);
   const inTelegram = isInsideTelegram();
 
+  const encodeImageForUpload = async (file) => {
+    const readAsDataUrl = (blob) =>
+      new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Could not read image file."));
+        reader.readAsDataURL(blob);
+      });
+
+    const rawDataUrl = await readAsDataUrl(file);
+    const mime = file.type || "image/png";
+    // Keep small images or animated GIFs as-is
+    if (mime === "image/gif" || file.size <= 350_000) {
+      return { mimeType: mime, dataBase64: rawDataUrl };
+    }
+
+    // Resize/compress larger photos or screenshots to keep database lean
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 1400;
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve({ mimeType: mime, dataBase64: rawDataUrl });
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        const targetMime = mime === "image/png" ? "image/png" : "image/jpeg";
+        const compressed = canvas.toDataURL(targetMime, 0.85);
+        resolve({ mimeType: targetMime, dataBase64: compressed });
+      };
+      img.onerror = () => resolve({ mimeType: mime, dataBase64: rawDataUrl });
+      img.src = rawDataUrl;
+    });
+  };
+
+  const handleUploadLessonImage = async (file) => {
+    if (!file) return;
+    setImageUploading(true);
+    setError("");
+    try {
+      const { mimeType, dataBase64 } = await encodeImageForUpload(file);
+      const uploaded = await api("/api/images", {
+        method: "POST",
+        body: JSON.stringify({
+          lesson_id: lesson?.id ?? null,
+          file_name: file.name || "pasted-image.png",
+          mime_type: mimeType,
+          data_base64: dataBase64,
+        }),
+      });
+      const textarea = contentRef.current;
+      const currentVal = textarea ? textarea.value : content;
+      const start = textarea ? textarea.selectionStart : currentVal.length;
+      const end = textarea ? textarea.selectionEnd : currentVal.length;
+      const prefix = start > 0 && currentVal[start - 1] !== "\n" ? "\n\n" : "";
+      const suffix = end < currentVal.length && currentVal[end] !== "\n" ? "\n\n" : "\n";
+      const snippet = `${prefix}![Explanation image](${uploaded.url})${suffix}`;
+      const nextVal = currentVal.slice(0, start) + snippet + currentVal.slice(end);
+      const nextCursor = start + snippet.length;
+      updateEditorContent(nextVal, nextCursor, nextCursor);
+      setNotice("Image added to lesson!");
+    } catch (err) {
+      setError(err.message || "Failed to upload image.");
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleEditorPaste = async (event) => {
+    const clipboard = event.clipboardData;
+    if (!clipboard) return;
+
+    // 1. Check direct image items/files in clipboard (screenshots, Copy Image from browser, etc.)
+    const items = Array.from(clipboard.items || []);
+    const imageItem = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        event.preventDefault();
+        await handleUploadLessonImage(file);
+        return;
+      }
+    }
+
+    const files = Array.from(clipboard.files || []);
+    const imageFile = files.find((f) => f.type.startsWith("image/"));
+    if (imageFile) {
+      event.preventDefault();
+      await handleUploadLessonImage(imageFile);
+      return;
+    }
+
+    // 2. Fallback: check pasted HTML for embedded data:image/... URI
+    const htmlData = clipboard.getData("text/html");
+    if (htmlData) {
+      const dataUriMatch = htmlData.match(/<img[^>]+src=["'](data:image\/[^"']+)["']/i);
+      if (dataUriMatch) {
+        event.preventDefault();
+        try {
+          const res = await fetch(dataUriMatch[1]);
+          const blob = await res.blob();
+          const pastedFile = new File([blob], "pasted-image.png", { type: blob.type || "image/png" });
+          await handleUploadLessonImage(pastedFile);
+        } catch (err) {
+          setError("Could not read pasted image from clipboard.");
+        }
+      }
+    }
+  };
+
   const handleToggleFullscreen = () => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -2428,6 +2548,8 @@ function App() {
                       </div>
                       <FormattingToolbar
                         onFormat={applyFormat}
+                        onUploadImage={handleUploadLessonImage}
+                        imageUploading={imageUploading}
                         onStandardize={() => {
                           if (!content.trim()) return;
                           const formatted = smartFormatAcademicText(content);
@@ -2463,6 +2585,7 @@ function App() {
                           handleEditorSelectionChange();
                         }}
                         onKeyDown={handleEditorKeyDown}
+                        onPaste={handleEditorPaste}
                         onSelect={handleEditorSelectionChange}
                         onClick={handleEditorSelectionChange}
                         onKeyUp={handleEditorSelectionChange}

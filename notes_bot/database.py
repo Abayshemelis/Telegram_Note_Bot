@@ -1320,6 +1320,40 @@ class Database:
             ).fetchone()
             return row is not None
 
+    def miniapp_create_image(
+        self,
+        lesson_id: int | None,
+        file_name: str,
+        mime_type: str,
+        data: bytes,
+    ) -> dict[str, Any]:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """
+                INSERT INTO lesson_images (lesson_id, file_name, mime_type, file_size, data)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id, lesson_id, file_name, mime_type, file_size, created_at
+                """,
+                (lesson_id, file_name, mime_type, len(data), data),
+            ).fetchone()
+            assert row is not None
+            row["url"] = f"/api/images/{row['id']}"
+            return row
+
+    def miniapp_get_image(self, image_id: int) -> dict[str, Any] | None:
+        with self._pool.connection() as connection:
+            row = connection.execute(
+                """
+                SELECT id, file_name, mime_type, file_size, data
+                FROM lesson_images
+                WHERE id = %s
+                """,
+                (image_id,),
+            ).fetchone()
+            if row is not None:
+                row["data"] = bytes(row["data"])
+            return row
+
     # ------------------------------------------------------------------
     # AI generations
     # ------------------------------------------------------------------

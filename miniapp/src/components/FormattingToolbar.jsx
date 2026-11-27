@@ -3,6 +3,8 @@ import { useRef, useEffect } from "react";
 export function FormattingToolbar({
   onFormat,
   onStandardize,
+  onUploadImage,
+  imageUploading = false,
   activeFormat,
   linkDialog,
   onCloseLink,
@@ -11,6 +13,7 @@ export function FormattingToolbar({
 }) {
   const urlInputRef = useRef(null);
   const textInputRef = useRef(null);
+  const imageInputRef = useRef(null);
 
   useEffect(() => {
     if (linkDialog?.isOpen) {
@@ -166,6 +169,49 @@ export function FormattingToolbar({
             </button>
           );
         })}
+        {onUploadImage && (
+          <>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  onUploadImage(file);
+                }
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              className="format-button"
+              style={{
+                width: "auto",
+                padding: "0 8px",
+                fontSize: "12px",
+                gap: "4px",
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+              disabled={imageUploading}
+              title="Insert Image (or Paste Ctrl+V directly in lesson)"
+              aria-label="Insert Image"
+              onMouseDown={(e) => {
+                e.preventDefault();
+              }}
+              onClick={() => imageInputRef.current?.click()}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+              <span style={{ fontWeight: 600 }}>{imageUploading ? "Uploading..." : "Image"}</span>
+            </button>
+          </>
+        )}
         {onStandardize && (
           <>
             <div

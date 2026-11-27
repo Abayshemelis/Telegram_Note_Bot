@@ -162,3 +162,13 @@ CREATE TABLE IF NOT EXISTS miniapp_quiz_versions (
 
 CREATE INDEX IF NOT EXISTS idx_miniapp_quiz_versions_quiz
     ON miniapp_quiz_versions (quiz_id, version_number DESC);
+
+CREATE TABLE IF NOT EXISTS lesson_images (
+    id BIGSERIAL PRIMARY KEY,
+    lesson_id BIGINT,
+    file_name TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    data BYTEA NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

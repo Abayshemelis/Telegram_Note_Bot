@@ -191,8 +191,37 @@ function escapeHtml(str) {
     .replace(/'/g, "&#039;");
 }
 
+function isSafeImageUrl(url) {
+  const clean = (url || "").trim();
+  return (
+    clean.startsWith("/api/images/") ||
+    clean.startsWith("https://") ||
+    clean.startsWith("http://") ||
+    clean.startsWith("data:image/")
+  );
+}
+
+function renderImageFigure(altRaw, urlRaw) {
+  const url = (urlRaw || "").trim();
+  if (!isSafeImageUrl(url)) return "";
+  const safeSrc = escapeHtml(url);
+  const altClean = (altRaw || "").trim();
+  const safeAlt = escapeHtml(altClean || "Lesson explanation image");
+  const showCaption =
+    altClean &&
+    !/^(image|pasted-image|explanation image|screenshot)$/i.test(altClean);
+  return `<figure class="pdf-image-figure"><img src="${safeSrc}" alt="${safeAlt}" class="pdf-lesson-image" loading="lazy" />${
+    showCaption ? `<figcaption class="pdf-image-caption">${safeAlt}</figcaption>` : ""
+  }</figure>`;
+}
+
 function formatInline(str) {
   return str
+    // Images: ![alt](url) — must run before Links
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, url) => {
+      if (!isSafeImageUrl(url)) return "";
+      return `<img src="${escapeHtml(url.trim())}" alt="${escapeHtml((alt || "").trim() || "Lesson image")}" class="pdf-lesson-image-inline" loading="lazy" />`;
+    })
     // Links: [text](url)
     .replace(
       /\[([^\]]+)\]\(([^)]+)\)/g,
@@ -326,6 +355,16 @@ export function renderMarkdownToHtml(md) {
     if (isTableBlock(cleanLines)) {
       htmlParts.push(renderTable(cleanLines));
       continue;
+    }
+
+    // Check Standalone Image Block: ![alt](url)
+    const imageMatch = cleanLines.length === 1 && cleanLines[0].match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+    if (imageMatch) {
+      const fig = renderImageFigure(imageMatch[1], imageMatch[2]);
+      if (fig) {
+        htmlParts.push(fig);
+        continue;
+      }
     }
 
     // Check Explicit Headings: # H1, ## H2, ### H3
