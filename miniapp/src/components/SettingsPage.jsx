@@ -564,15 +564,15 @@ export function SettingsPage({ admin, busy }) {
 
   return (
     <div className="settings-container">
-      <div className="panel-heading" style={{ marginBottom: "var(--space-6)" }}>
+      <div className="panel-heading settings-page-heading">
         <div>
           <p className="eyebrow">STUDIO CONFIGURATION</p>
           <h2>Preferences & Control Center</h2>
         </div>
-        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+        <div className="settings-top-actions">
           {isDirty && (
             <span className="status status-partial" style={{ fontSize: "11px" }}>
-              ● Unsaved Changes
+              ● Unsaved
             </span>
           )}
           <button
@@ -580,7 +580,7 @@ export function SettingsPage({ admin, busy }) {
             className="secondary-button"
             disabled={!isDirty || saving}
             onClick={handleReset}
-            style={{ minHeight: "32px", fontSize: "12px" }}
+            style={{ minHeight: "34px", fontSize: "12px" }}
           >
             Reset
           </button>
@@ -589,7 +589,7 @@ export function SettingsPage({ admin, busy }) {
             className="primary-button"
             disabled={(!isDirty && !channelVerifyState.ok && !aiTestState.ok) || saving}
             onClick={handleSave}
-            style={{ minHeight: "32px", fontSize: "12px", minWidth: "110px" }}
+            style={{ minHeight: "34px", fontSize: "12px", minWidth: "112px" }}
           >
             {saving ? "Saving…" : "Save Settings"}
           </button>
@@ -777,15 +777,7 @@ export function SettingsPage({ admin, busy }) {
           <div className="dual-engine-cards-grid" style={{ marginTop: "14px" }}>
             
             {/* Card 1: Groq Cloud Configuration */}
-            <div
-              style={{
-                border: settings.ai_provider === "groq" ? "2px solid var(--accent)" : "1px solid var(--border)",
-                borderRadius: "10px",
-                padding: "16px",
-                background: settings.ai_provider === "groq" ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.2)",
-                position: "relative",
-              }}
-            >
+            <div className={`engine-card ${settings.ai_provider === "groq" ? "active" : ""}`}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                 <div>
                   <h4 style={{ margin: 0, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -801,7 +793,7 @@ export function SettingsPage({ admin, busy }) {
                   href="https://console.groq.com/keys"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: "11px", color: "var(--accent)" }}
+                  style={{ fontSize: "11px", color: "var(--accent)", fontWeight: 500 }}
                 >
                   Get Key ↗
                 </a>
@@ -809,14 +801,14 @@ export function SettingsPage({ admin, busy }) {
 
               {/* Groq Key Input */}
               <div style={{ marginBottom: "10px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px", color: "var(--text-weak)" }}>
                   API Key
                 </label>
-                <div className="settings-input-group">
+                <div className="settings-row-inline-group">
                   <input
                     type={showGroqKey ? "text" : "password"}
                     className="settings-input"
-                    style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: "11px" }}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
                     placeholder="gsk_..."
                     value={settings.groq_api_key || ""}
                     onChange={(e) => {
@@ -833,7 +825,7 @@ export function SettingsPage({ admin, busy }) {
                     type="button"
                     className="secondary-button"
                     onClick={() => setShowGroqKey((v) => !v)}
-                    style={{ minHeight: "30px", fontSize: "11px", padding: "0 8px" }}
+                    style={{ minHeight: "34px", fontSize: "12px", padding: "0 9px", flexShrink: 0 }}
                     title={showGroqKey ? "Hide" : "Show"}
                   >
                     {showGroqKey ? "🙈" : "👁"}
@@ -843,19 +835,19 @@ export function SettingsPage({ admin, busy }) {
                     className="secondary-button"
                     onClick={() => testProvider("groq")}
                     disabled={groqTestState.loading || !settings.groq_api_key?.trim()}
-                    style={{ minHeight: "30px", fontSize: "11px", padding: "0 10px", whiteSpace: "nowrap" }}
+                    style={{ minHeight: "34px", fontSize: "12px", padding: "0 10px", whiteSpace: "nowrap", flexShrink: 0 }}
                   >
-                    {groqTestState.loading ? "…" : "Test Groq"}
+                    {groqTestState.loading ? "…" : "Test"}
                   </button>
                 </div>
               </div>
 
               {/* Groq Model Selector */}
               <div style={{ marginBottom: "8px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px", color: "var(--text-weak)" }}>
                   Model
                 </label>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div className="settings-row-inline-group">
                   {!groqCustomModelMode ? (
                     <select
                       className="settings-select"
@@ -935,15 +927,7 @@ export function SettingsPage({ admin, busy }) {
             </div>
 
             {/* Card 2: Google Gemini Configuration */}
-            <div
-              style={{
-                border: settings.ai_provider === "gemini" ? "2px solid var(--accent)" : "1px solid var(--border)",
-                borderRadius: "10px",
-                padding: "16px",
-                background: settings.ai_provider === "gemini" ? "rgba(255, 255, 255, 0.03)" : "rgba(0, 0, 0, 0.2)",
-                position: "relative",
-              }}
-            >
+            <div className={`engine-card ${settings.ai_provider === "gemini" ? "active" : ""}`}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                 <div>
                   <h4 style={{ margin: 0, fontSize: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
@@ -959,7 +943,7 @@ export function SettingsPage({ admin, busy }) {
                   href="https://aistudio.google.com/app/apikey"
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{ fontSize: "11px", color: "var(--accent)" }}
+                  style={{ fontSize: "11px", color: "var(--accent)", fontWeight: 500 }}
                 >
                   Get Key ↗
                 </a>
@@ -967,14 +951,14 @@ export function SettingsPage({ admin, busy }) {
 
               {/* Gemini Key Input */}
               <div style={{ marginBottom: "10px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px", color: "var(--text-weak)" }}>
                   API Key
                 </label>
-                <div className="settings-input-group">
+                <div className="settings-row-inline-group">
                   <input
                     type={showGeminiKey ? "text" : "password"}
                     className="settings-input"
-                    style={{ flex: 1, fontFamily: "var(--font-mono)", fontSize: "11px" }}
+                    style={{ fontFamily: "var(--font-mono)", fontSize: "12px" }}
                     placeholder="AIzaSy... or AQ..."
                     value={settings.gemini_api_key || ""}
                     onChange={(e) => {
@@ -991,7 +975,7 @@ export function SettingsPage({ admin, busy }) {
                     type="button"
                     className="secondary-button"
                     onClick={() => setShowGeminiKey((v) => !v)}
-                    style={{ minHeight: "30px", fontSize: "11px", padding: "0 8px" }}
+                    style={{ minHeight: "34px", fontSize: "12px", padding: "0 9px", flexShrink: 0 }}
                     title={showGeminiKey ? "Hide" : "Show"}
                   >
                     {showGeminiKey ? "🙈" : "👁"}
@@ -1001,19 +985,19 @@ export function SettingsPage({ admin, busy }) {
                     className="secondary-button"
                     onClick={() => testProvider("gemini")}
                     disabled={geminiTestState.loading || !settings.gemini_api_key?.trim()}
-                    style={{ minHeight: "30px", fontSize: "11px", padding: "0 10px", whiteSpace: "nowrap" }}
+                    style={{ minHeight: "34px", fontSize: "12px", padding: "0 10px", whiteSpace: "nowrap", flexShrink: 0 }}
                   >
-                    {geminiTestState.loading ? "…" : "Test Gemini"}
+                    {geminiTestState.loading ? "…" : "Test"}
                   </button>
                 </div>
               </div>
 
               {/* Gemini Model Selector */}
               <div style={{ marginBottom: "8px" }}>
-                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px" }}>
+                <label style={{ fontSize: "11px", fontWeight: 600, display: "block", marginBottom: "4px", color: "var(--text-weak)" }}>
                   Model
                 </label>
-                <div style={{ display: "flex", gap: "6px" }}>
+                <div className="settings-row-inline-group">
                   {!geminiCustomModelMode ? (
                     <select
                       className="settings-select"
@@ -1127,8 +1111,8 @@ export function SettingsPage({ admin, busy }) {
                 </div>
                 <input
                   type="text"
-                  className="settings-input"
-                  style={{ width: "320px", fontSize: "11px", fontFamily: "var(--font-mono)" }}
+                  className="settings-input settings-field-control-col"
+                  style={{ width: "100%", maxWidth: "320px", fontSize: "12px", fontFamily: "var(--font-mono)" }}
                   value={settings.ai_provider_url || ""}
                   onChange={(e) => setSettings((s) => ({ ...s, ai_provider_url: e.target.value }))}
                 />
@@ -1182,7 +1166,7 @@ export function SettingsPage({ admin, busy }) {
               <strong>Header Presentation Style</strong>
               <p className="muted small">Visual banner badge on reader preview & exported PDF</p>
             </div>
-            <div>
+            <div className="settings-field-control-col">
               <select
                 className="settings-select"
                 value={settings.post_header_style}
@@ -1200,11 +1184,11 @@ export function SettingsPage({ admin, busy }) {
               <strong>Institutional Branding Signature</strong>
               <p className="muted small">Author organization printed on PDF header & channel footer</p>
             </div>
-            <div>
+            <div className="settings-field-control-col">
               <input
                 type="text"
                 className="settings-input"
-                style={{ width: "240px" }}
+                style={{ width: "100%", maxWidth: "280px" }}
                 value={settings.branding_signature}
                 onChange={(e) => setSettings((s) => ({ ...s, branding_signature: e.target.value }))}
                 placeholder="e.g. CyberLearn Academic Team"
@@ -1473,6 +1457,30 @@ export function SettingsPage({ admin, busy }) {
           )}
         </div>
       </section>
+
+      {isDirty && (
+        <div className="settings-sticky-save-bar">
+          <span className="settings-sticky-save-label">You have unsaved changes</span>
+          <div className="settings-sticky-save-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={saving}
+              onClick={handleReset}
+            >
+              Reset
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              disabled={saving}
+              onClick={handleSave}
+            >
+              {saving ? "Saving…" : "Save Changes"}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
