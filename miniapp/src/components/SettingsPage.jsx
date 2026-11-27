@@ -103,6 +103,7 @@ export function SettingsPage({ admin, busy }) {
       const res = await fetch("/api/settings", {
         headers: {
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
       });
       if (res.ok) {
@@ -143,6 +144,7 @@ export function SettingsPage({ admin, busy }) {
       const res = await fetch("/api/audit?limit=25", {
         headers: {
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
       });
       if (res.ok) {
@@ -186,6 +188,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify({ channel: target }),
       });
@@ -302,6 +305,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify({
           ai_provider: targetProvider,
@@ -356,6 +360,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify({
           ai_provider: targetProvider,
@@ -402,6 +407,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify({
           ai_provider: settings.ai_provider,
@@ -475,6 +481,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify({
           ai_provider: settings.ai_provider,
@@ -536,6 +543,7 @@ export function SettingsPage({ admin, busy }) {
         headers: {
           "Content-Type": "application/json",
           "X-Telegram-Init-Data": window.Telegram?.WebApp?.initData ?? "",
+          "X-Admin-Token": window.localStorage.getItem("cyberlearn-admin-token") ?? "",
         },
         body: JSON.stringify(payload),
       });

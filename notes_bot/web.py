@@ -322,6 +322,66 @@ class ChannelVerifyRequest(BaseModel):
     channel: str = Field(min_length=1, max_length=100)
 
 
+def create_browser_admin_token(
+    bot_token: str,
+    user_id: int,
+    first_name: str = "Admin",
+    username: str = "",
+    ttl_seconds: int = 7 * 86400,
+) -> str:
+    payload = {
+        "id": int(user_id),
+        "first_name": (first_name or "Admin")[:64],
+        "username": (username or "")[:64],
+        "exp": int(time.time()) + ttl_seconds,
+    }
+    raw = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+    payload_b64 = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+    key = hmac.new(
+        b"CyberLearnBrowserAdmin", bot_token.encode("utf-8"), hashlib.sha256
+    ).digest()
+    sig = hmac.new(key, payload_b64.encode("ascii"), hashlib.sha256).hexdigest()
+    return f"{payload_b64}.{sig}"
+
+
+def verify_browser_admin_token(
+    token: str,
+    bot_token: str,
+    admin_ids: frozenset[int],
+    *,
+    now: int | None = None,
+) -> dict[str, Any]:
+    if "." not in token:
+        raise ValueError("Malformed admin token.")
+    payload_b64, supplied_sig = token.split(".", 1)
+    if len(supplied_sig) != 64:
+        raise ValueError("Invalid admin token signature.")
+    key = hmac.new(
+        b"CyberLearnBrowserAdmin", bot_token.encode("utf-8"), hashlib.sha256
+    ).digest()
+    expected_sig = hmac.new(
+        key, payload_b64.encode("ascii"), hashlib.sha256
+    ).hexdigest()
+    if not hmac.compare_digest(supplied_sig, expected_sig):
+        raise ValueError("Invalid admin token signature.")
+    padded = payload_b64 + "=" * (-len(payload_b64) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(padded.encode("ascii")).decode("utf-8"))
+    current_time = int(time.time()) if now is None else now
+    if int(payload.get("exp", 0)) <= current_time:
+        raise ValueError("Browser admin session has expired. Run /studio in Telegram for a new link.")
+    user_id = int(payload["id"])
+    if user_id not in admin_ids:
+        raise HTTPException(
+            status_code=403,
+            detail="Your Telegram account is not configured as an admin.",
+        )
+    return {
+        "id": user_id,
+        "first_name": payload.get("first_name") or "Admin",
+        "username": payload.get("username") or "",
+    }
+
+
 def verify_telegram_init_data(
     init_data: str,
     bot_token: str,
@@ -429,13 +489,25 @@ def create_app(
         x_telegram_init_data: Annotated[
             str | None, Header(alias="X-Telegram-Init-Data")
         ] = None,
+        x_admin_token: Annotated[
+            str | None, Header(alias="X-Admin-Token")
+        ] = None,
     ) -> dict[str, Any]:
-        if not x_telegram_init_data:
-            raise HTTPException(
-                status_code=401, detail="Open this app from Telegram to sign in."
+        if x_telegram_init_data:
+            return verify_telegram_init_data(
+                x_telegram_init_data, config.bot_token, config.admin_ids
             )
-        return verify_telegram_init_data(
-            x_telegram_init_data, config.bot_token, config.admin_ids
+        if x_admin_token:
+            try:
+                return verify_browser_admin_token(
+                    x_admin_token, config.bot_token, config.admin_ids
+                )
+            except HTTPException:
+                raise
+            except ValueError as exc:
+                raise HTTPException(status_code=401, detail=str(exc)) from exc
+        raise HTTPException(
+            status_code=401, detail="Open this app from Telegram to sign in."
         )
 
     async def db_call(method: str, *args: Any) -> Any:

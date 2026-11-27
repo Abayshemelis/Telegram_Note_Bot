@@ -1758,6 +1758,15 @@ async def studio_command(
 
     mini_app_url = context.bot_data.get("mini_app_url")
     if mini_app_url:
+        from notes_bot.web import create_browser_admin_token
+
+        browser_token = create_browser_admin_token(
+            context.bot.token,
+            user.id,
+            user.first_name or "Admin",
+            user.username or "",
+        )
+        browser_admin_url = f"{mini_app_url.rstrip('/')}/?admin_token={browser_token}"
         try:
             keyboard = InlineKeyboardMarkup([
                 [
@@ -1768,16 +1777,16 @@ async def studio_command(
                 ],
                 [
                     InlineKeyboardButton(
-                        text="🌐 Open in Browser (Direct Link)",
-                        url=mini_app_url,
+                        text="🌐 Open Admin Studio in Browser",
+                        url=browser_admin_url,
                     )
                 ]
             ])
             await message.reply_text(
                 "<b>CyberLearn Studio</b>\n\n"
-                "Tap below to launch your studio workspace:\n\n"
-                f"🔗 Direct Link: <a href=\"{mini_app_url}\">{mini_app_url}</a>\n"
-                f"<i>(If Telegram WebApp takes time to load, tap 'Open in Browser')</i>",
+                "Tap below to launch your studio workspace inside Telegram or in your web browser (valid 7 days):\n\n"
+                f"🔗 Browser Admin Link: <a href=\"{browser_admin_url}\">Open Admin Studio</a>\n"
+                f"<i>(Do not share the Browser Admin Link with students — it signs in as you.)</i>",
                 reply_markup=keyboard,
                 parse_mode="HTML",
             )
@@ -1787,15 +1796,15 @@ async def studio_command(
             keyboard = InlineKeyboardMarkup([
                 [
                     InlineKeyboardButton(
-                        text="🌐 Open in Browser",
-                        url=mini_app_url,
+                        text="🌐 Open Admin Studio in Browser",
+                        url=browser_admin_url,
                     )
                 ]
             ])
             await message.reply_text(
                 f"<b>CyberLearn Studio</b>\n\n"
-                f"Access your studio directly via this link:\n"
-                f"🔗 <a href=\"{mini_app_url}\">{mini_app_url}</a>",
+                f"Access your admin workspace in your browser (valid 7 days):\n"
+                f"🔗 <a href=\"{browser_admin_url}\">Open Admin Studio</a>",
                 reply_markup=keyboard,
                 parse_mode="HTML",
             )

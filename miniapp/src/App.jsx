@@ -95,8 +95,30 @@ export function isInsideTelegram() {
   return false;
 }
 
+const ADMIN_TOKEN_STORAGE_KEY = "cyberlearn-admin-token";
+
+function getBrowserAdminToken() {
+  if (typeof window === "undefined") return "";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const fromQuery = params.get("admin_token");
+    if (fromQuery) {
+      window.localStorage.setItem(ADMIN_TOKEN_STORAGE_KEY, fromQuery);
+      params.delete("admin_token");
+      const remaining = params.toString();
+      const cleanUrl = `${window.location.pathname}${remaining ? `?${remaining}` : ""}${window.location.hash}`;
+      window.history.replaceState({}, "", cleanUrl);
+      return fromQuery;
+    }
+    return window.localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+
 async function api(path, options = {}) {
   const initData = getTelegramInitData();
+  const adminToken = getBrowserAdminToken();
   const { timeoutMs = 30000, ...fetchOptions } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -107,6 +129,7 @@ async function api(path, options = {}) {
       headers: {
         "Content-Type": "application/json",
         "X-Telegram-Init-Data": initData,
+        ...(adminToken ? { "X-Admin-Token": adminToken } : {}),
         ...fetchOptions.headers,
       },
     });
@@ -533,9 +556,10 @@ function App() {
       };
     }
 
-    // If opened directly in browser/Chrome outside Telegram:
+    // If opened directly in browser/Chrome outside Telegram without a browser admin token:
     // Don't make the user wait. If a specific lesson was targeted, checkPublicLesson handles it.
-    if (!isInsideTelegram() && !getTelegramInitData()) {
+    const browserAdminToken = getBrowserAdminToken();
+    if (!isInsideTelegram() && !getTelegramInitData() && !browserAdminToken) {
       if (targetId) {
         return () => {
           active = false;
@@ -592,7 +616,8 @@ function App() {
     const attemptAuth = () => {
       if (!active) return;
       const initData = getTelegramInitData();
-      if (initData) {
+      const adminToken = getBrowserAdminToken();
+      if (initData || adminToken) {
         api("/api/me")
           .then(async (profile) => {
             if (!active) return;
@@ -600,6 +625,11 @@ function App() {
             await Promise.all([loadCourses(), loadDashboard(), loadCategories()]);
           })
           .catch((cause) => {
+            if (!initData && adminToken) {
+              try {
+                window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+              } catch {}
+            }
             if (active) setError(cause.message);
           })
           .finally(() => {
@@ -1937,6 +1967,13 @@ function App() {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
+    }
+    if (!inTelegram) {
+      try {
+        window.localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+      } catch {}
+      setAdmin(null);
+      return;
     }
     try {
       const tg = window.Telegram?.WebApp;
