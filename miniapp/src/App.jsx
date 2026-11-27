@@ -186,6 +186,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const wantsFullscreenRef = useRef(true);
+  const lastCursorRef = useRef({ start: 0, end: 0 });
   const editorHistoryRef = useRef({ past: [], future: [], lastTypedAt: 0 });
   const [historyStatus, setHistoryStatus] = useState({ canUndo: false, canRedo: false });
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -827,6 +828,10 @@ function App() {
   const handleEditorSelectionChange = () => {
     const textarea = contentRef.current;
     if (!textarea) return;
+    lastCursorRef.current = {
+      start: textarea.selectionStart ?? 0,
+      end: textarea.selectionEnd ?? 0,
+    };
     const active = detectActiveFormat(textarea.value, textarea.selectionStart, textarea.selectionEnd);
     setFormattingActive(active);
   };
@@ -1656,13 +1661,17 @@ function App() {
   const insertImageMarkdownAtCursor = (imageUrl) => {
     const textarea = contentRef.current;
     const currentVal = textarea ? textarea.value : content;
-    const start = textarea ? textarea.selectionStart : currentVal.length;
-    const end = textarea ? textarea.selectionEnd : currentVal.length;
+    const isFocused = Boolean(textarea && document.activeElement === textarea);
+    const rawStart = isFocused ? textarea.selectionStart : lastCursorRef.current.start;
+    const rawEnd = isFocused ? textarea.selectionEnd : lastCursorRef.current.end;
+    const start = Math.max(0, Math.min(rawStart ?? currentVal.length, currentVal.length));
+    const end = Math.max(start, Math.min(rawEnd ?? start, currentVal.length));
     const prefix = start > 0 && currentVal[start - 1] !== "\n" ? "\n\n" : "";
     const suffix = end < currentVal.length && currentVal[end] !== "\n" ? "\n\n" : "\n";
     const snippet = `${prefix}![Explanation image](${imageUrl})${suffix}`;
     const nextVal = currentVal.slice(0, start) + snippet + currentVal.slice(end);
     const nextCursor = start + snippet.length;
+    lastCursorRef.current = { start: nextCursor, end: nextCursor };
     updateEditorContent(nextVal, nextCursor, nextCursor);
   };
 
@@ -2770,6 +2779,7 @@ function App() {
                         onSelect={handleEditorSelectionChange}
                         onClick={handleEditorSelectionChange}
                         onKeyUp={handleEditorSelectionChange}
+                        onBlur={handleEditorSelectionChange}
                         placeholder="Write formatted lesson. Use ## headings, lists, > quotes, and ``` code blocks..."
                       />
                       {(() => {
