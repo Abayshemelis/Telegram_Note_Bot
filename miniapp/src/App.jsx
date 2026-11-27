@@ -185,6 +185,7 @@ function App() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const wantsFullscreenRef = useRef(true);
   const editorHistoryRef = useRef({ past: [], future: [], lastTypedAt: 0 });
   const [historyStatus, setHistoryStatus] = useState({ canUndo: false, canRedo: false });
   const [confirmDialog, setConfirmDialog] = useState(null);
@@ -1714,14 +1715,17 @@ function App() {
     try {
       const tg = window.Telegram?.WebApp;
       if (!tg) return;
-      tg.expand?.();
-      if (isFullscreen && typeof tg.requestFullscreen === "function") {
-        setTimeout(() => {
-          try {
+      const runRestore = () => {
+        try {
+          tg.expand?.();
+          if (wantsFullscreenRef.current && typeof tg.requestFullscreen === "function" && !tg.isFullscreen) {
             tg.requestFullscreen();
-          } catch {}
-        }, 120);
-      }
+          }
+        } catch {}
+      };
+      runRestore();
+      setTimeout(runRestore, 180);
+      setTimeout(runRestore, 500);
     } catch {}
   };
 
@@ -1880,10 +1884,12 @@ function App() {
     if (!tg) return;
     try {
       if (tg.isFullscreen) {
+        wantsFullscreenRef.current = false;
         if (typeof tg.exitFullscreen === "function") {
           tg.exitFullscreen();
         }
       } else {
+        wantsFullscreenRef.current = true;
         if (typeof tg.requestFullscreen === "function") {
           tg.requestFullscreen();
         }
@@ -2769,6 +2775,7 @@ function App() {
                       {(() => {
                         const imgs = [...(content || "").matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)].map((m, idx) => ({
                           raw: m[0],
+                          index: m.index ?? 0,
                           alt: m[1] || `Image ${idx + 1}`,
                           url: m[2],
                         }));
@@ -2784,10 +2791,17 @@ function App() {
                                     type="button"
                                     className="editor-image-remove-btn"
                                     title="Remove image from lesson"
-                                    onClick={() => {
-                                      pushEditorHistory(content, false);
-                                      const next = content.replace(img.raw, "").replace(/\n{3,}/g, "\n\n").trim();
-                                      setContent(next);
+                                    aria-label={`Remove ${img.alt}`}
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      const currentVal = contentRef.current ? contentRef.current.value : content;
+                                      pushEditorHistory(currentVal, false);
+                                      const before = currentVal.slice(0, img.index);
+                                      const after = currentVal.slice(img.index + img.raw.length);
+                                      const next = (before + after).replace(/\n{3,}/g, "\n\n").trim();
+                                      applyEditorSnapshot(next);
+                                      setNotice("Image removed from lesson.");
                                     }}
                                   >
                                     ×
