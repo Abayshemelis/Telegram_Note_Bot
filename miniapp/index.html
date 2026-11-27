@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#090910" />
+    <meta name="color-scheme" content="dark light" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>CyberLearn Studio</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("cyberlearn-theme");
+          var html = document.documentElement;
+          function apply(theme) {
+            var resolved = theme === "system"
+              ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+              : theme;
+            html.setAttribute("data-theme", resolved);
+            html.style.colorScheme = resolved;
+            var meta = document.querySelector('meta[name="theme-color"]');
+            var bg = resolved === "light" ? "#f3efe6" : "#090910";
+            if (meta) {
+              meta.setAttribute("content", bg);
+            }
+            if (window.Telegram && window.Telegram.WebApp) {
+              var tg = window.Telegram.WebApp;
+              try {
+                if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor(bg);
+                if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(bg);
+              } catch (err) {}
+            }
+          }
+          if (stored === "light") {
+            apply("light");
+          } else {
+            apply("dark");
+          }
+
+          if (window.Telegram && window.Telegram.WebApp) {
+            var tg = window.Telegram.WebApp;
+            try {
+              tg.ready();
+              tg.expand();
+              if (typeof tg.requestFullscreen === 'function') {
+                try { tg.requestFullscreen(); } catch (err) {}
+              }
+              var initialBg = (stored === "light") ? "#f3efe6" : "#090910";
+              if (typeof tg.setHeaderColor === 'function') tg.setHeaderColor(initialBg);
+              if (typeof tg.setBackgroundColor === 'function') tg.setBackgroundColor(initialBg);
+              if (typeof tg.disableVerticalSwipes === 'function') {
+                tg.disableVerticalSwipes();
+              }
+            } catch (err) {}
+
+            var isTg = Boolean(
+              window.TelegramWebviewProxy ||
+              window.TelegramGameProxy ||
+              (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.webApp) ||
+              (tg.platform && tg.platform !== 'unknown') ||
+              (tg.initData && tg.initData !== '') ||
+              (tg.initDataUnsafe && Object.keys(tg.initDataUnsafe).length > 0) ||
+              window.location.hash.indexOf('tgWebAppData') !== -1 ||
+              window.location.search.indexOf('tgWebAppData') !== -1 ||
+              (navigator.userAgent && /Telegram/i.test(navigator.userAgent))
+            );
+            if (isTg) {
+              html.classList.add('in-telegram');
+              html.setAttribute('data-in-telegram', 'true');
+            }
+
+            function syncInsets() {
+              var cs = tg.contentSafeAreaInset;
+              var s = tg.safeAreaInset;
+              if (cs) {
+                html.style.setProperty('--tg-content-safe-area-inset-top', cs.top + 'px');
+                html.style.setProperty('--tg-content-safe-area-inset-right', cs.right + 'px');
+                html.style.setProperty('--tg-content-safe-area-inset-bottom', cs.bottom + 'px');
+                html.style.setProperty('--tg-content-safe-area-inset-left', cs.left + 'px');
+              }
+              if (s) {
+                html.style.setProperty('--tg-safe-area-inset-top', s.top + 'px');
+                html.style.setProperty('--tg-safe-area-inset-right', s.right + 'px');
+                html.style.setProperty('--tg-safe-area-inset-bottom', s.bottom + 'px');
+                html.style.setProperty('--tg-safe-area-inset-left', s.left + 'px');
+              }
+              if (tg.isFullscreen) {
+                html.setAttribute('data-tg-fullscreen', 'true');
+              } else {
+                html.removeAttribute('data-tg-fullscreen');
+              }
+            }
+            syncInsets();
+            if (tg.onEvent) {
+              tg.onEvent('contentSafeAreaChanged', syncInsets);
+              tg.onEvent('safeAreaChanged', syncInsets);
+              tg.onEvent('fullscreenChanged', syncInsets);
+            }
+            setTimeout(function () {
+              try {
+                if (typeof tg.requestFullscreen === 'function') {
+                  tg.requestFullscreen();
+                }
+              } catch (e) {}
+            }, 150);
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

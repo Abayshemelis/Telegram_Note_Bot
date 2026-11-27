@@ -1,0 +1,18 @@
+[Unit]
+Description=CyberLearn Telegram Note Bot and Studio
+After=network-online.target postgresql.service
+Wants=network-online.target postgresql.service
+
+[Service]
+Type=simple
+User=amazi1075
+WorkingDirectory=/home/amazi1075/Work/Telegram_Note_Bot
+ExecStart=/home/amazi1075/Work/Telegram_Note_Bot/run_all.sh
+Restart=always
+RestartSec=10
+KillMode=mixed
+TimeoutStopSec=10
+
+[Install]
+WantedBy=multi-user.target
+

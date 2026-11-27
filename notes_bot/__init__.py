@@ -1,0 +1,1 @@
+"""Telegram study notes bot."""
