@@ -4,7 +4,12 @@ export function FormattingToolbar({
   onFormat,
   onStandardize,
   onUploadImage,
+  onPasteImage,
   imageUploading = false,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
   activeFormat,
   linkDialog,
   onCloseLink,
@@ -149,6 +154,51 @@ export function FormattingToolbar({
   return (
     <div className="formatting-toolbar-wrapper">
       <div className="formatting-toolbar" role="toolbar" aria-label="Text formatting">
+        {onUndo && (
+          <button
+            type="button"
+            className="format-button"
+            title="Undo (Ctrl+Z)"
+            aria-label="Undo"
+            disabled={!canUndo}
+            style={{ opacity: canUndo ? 1 : 0.4 }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onUndo}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M3 7v6h6" />
+              <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+            </svg>
+          </button>
+        )}
+        {onRedo && (
+          <button
+            type="button"
+            className="format-button"
+            title="Redo (Ctrl+Y)"
+            aria-label="Redo"
+            disabled={!canRedo}
+            style={{ opacity: canRedo ? 1 : 0.4 }}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={onRedo}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M21 7v6h-6" />
+              <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+            </svg>
+          </button>
+        )}
+        {(onUndo || onRedo) && (
+          <div
+            className="formatting-toolbar-divider"
+            style={{
+              width: "1px",
+              height: "18px",
+              backgroundColor: "var(--border-subtle, rgba(255, 255, 255, 0.15))",
+              margin: "0 4px",
+            }}
+          />
+        )}
         {buttons.map((button) => {
           const isActive =
             activeFormat === button.format || (button.format === "link" && linkDialog?.isOpen);
@@ -209,6 +259,28 @@ export function FormattingToolbar({
               </svg>
               <span style={{ fontWeight: 600 }}>{imageUploading ? "Uploading..." : "Image"}</span>
             </label>
+            {onPasteImage && (
+              <button
+                type="button"
+                className="format-button"
+                style={{
+                  width: "auto",
+                  padding: "0 8px",
+                  fontSize: "12px",
+                  gap: "4px",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+                disabled={imageUploading}
+                title="Paste copied image from clipboard"
+                aria-label="Paste Image"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={onPasteImage}
+              >
+                <span aria-hidden="true">📋</span>
+                <span style={{ fontWeight: 600 }}>Paste Img</span>
+              </button>
+            )}
           </>
         )}
         {onStandardize && (

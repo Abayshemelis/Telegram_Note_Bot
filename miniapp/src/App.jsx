@@ -185,6 +185,8 @@ function App() {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
+  const editorHistoryRef = useRef({ past: [], future: [], lastTypedAt: 0 });
+  const [historyStatus, setHistoryStatus] = useState({ canUndo: false, canRedo: false });
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(() => {
     return Boolean(window.Telegram?.WebApp?.isFullscreen);
@@ -750,8 +752,62 @@ function App() {
       : await confirmDiscardQuizChanges()
   );
 
+  const syncHistoryStatus = () => {
+    const h = editorHistoryRef.current;
+    setHistoryStatus({ canUndo: h.past.length > 0, canRedo: h.future.length > 0 });
+  };
+
+  const pushEditorHistory = (prevValue, isTyping = false) => {
+    const h = editorHistoryRef.current;
+    const now = Date.now();
+    if (isTyping && h.past.length > 0 && now - h.lastTypedAt < 800) {
+      h.lastTypedAt = now;
+      return;
+    }
+    if (h.past[h.past.length - 1] !== prevValue) {
+      h.past.push(prevValue);
+      if (h.past.length > 60) h.past.shift();
+    }
+    h.future = [];
+    h.lastTypedAt = isTyping ? now : 0;
+    syncHistoryStatus();
+  };
+
+  const applyEditorSnapshot = (value) => {
+    const textarea = contentRef.current;
+    setContent(value);
+    if (textarea) {
+      textarea.value = value;
+      textarea.focus();
+    }
+  };
+
+  const handleUndo = () => {
+    const h = editorHistoryRef.current;
+    if (!h.past.length) return;
+    const current = contentRef.current ? contentRef.current.value : content;
+    const previous = h.past.pop();
+    h.future.push(current);
+    applyEditorSnapshot(previous);
+    syncHistoryStatus();
+  };
+
+  const handleRedo = () => {
+    const h = editorHistoryRef.current;
+    if (!h.future.length) return;
+    const current = contentRef.current ? contentRef.current.value : content;
+    const next = h.future.pop();
+    h.past.push(current);
+    applyEditorSnapshot(next);
+    syncHistoryStatus();
+  };
+
   const updateEditorContent = (newValue, newStart, newEnd) => {
     const textarea = contentRef.current;
+    const prevValue = textarea ? textarea.value : content;
+    if (prevValue !== newValue) {
+      pushEditorHistory(prevValue, false);
+    }
     setContent(newValue);
     if (textarea) {
       textarea.value = newValue;
@@ -868,6 +924,22 @@ function App() {
         applyFormat("inline-code");
         return;
       }
+      if (event.key === "z" || event.key === "Z") {
+        event.preventDefault();
+        handleUndo();
+        return;
+      }
+      if (event.key === "y" || event.key === "Y") {
+        event.preventDefault();
+        handleRedo();
+        return;
+      }
+    }
+
+    if (isMod && event.shiftKey && !event.altKey && (event.key === "z" || event.key === "Z")) {
+      event.preventDefault();
+      handleRedo();
+      return;
     }
 
     if (event.key === "Tab") {
@@ -1638,8 +1710,24 @@ function App() {
     });
   };
 
+  const restoreTelegramWindowSize = () => {
+    try {
+      const tg = window.Telegram?.WebApp;
+      if (!tg) return;
+      tg.expand?.();
+      if (isFullscreen && typeof tg.requestFullscreen === "function") {
+        setTimeout(() => {
+          try {
+            tg.requestFullscreen();
+          } catch {}
+        }, 120);
+      }
+    } catch {}
+  };
+
   const handleUploadLessonImage = async (file) => {
     if (!file) return;
+    restoreTelegramWindowSize();
     setImageUploading(true);
     setError("");
     try {
@@ -1660,6 +1748,50 @@ function App() {
       setError(err.message || "Failed to upload image.");
     } finally {
       setImageUploading(false);
+    }
+  };
+
+  const handlePasteImageFromClipboard = async () => {
+    setError("");
+    try {
+      if (navigator.clipboard?.read) {
+        const items = await navigator.clipboard.read();
+        for (const item of items) {
+          const imgType = item.types.find((t) => t.startsWith("image/"));
+          if (imgType) {
+            const blob = await item.getType(imgType);
+            const file = new File([blob], "pasted-image.png", { type: imgType });
+            await handleUploadLessonImage(file);
+            return;
+          }
+          if (item.types.includes("text/html")) {
+            const htmlBlob = await item.getType("text/html");
+            const htmlText = await htmlBlob.text();
+            const dataUriMatch = htmlText.match(/<img[^>]+src=["'](data:image\/[^"']+)["']/i);
+            if (dataUriMatch) {
+              const res = await fetch(dataUriMatch[1]);
+              const blob = await res.blob();
+              await handleUploadLessonImage(new File([blob], "pasted-image.png", { type: blob.type || "image/png" }));
+              return;
+            }
+            const remoteImgMatch = htmlText.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i);
+            if (remoteImgMatch) {
+              await handleImportImageUrl(remoteImgMatch[1]);
+              return;
+            }
+          }
+        }
+      }
+      if (navigator.clipboard?.readText) {
+        const txt = (await navigator.clipboard.readText()).trim();
+        if (/^https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?$/i.test(txt)) {
+          await handleImportImageUrl(txt);
+          return;
+        }
+      }
+      setError("No image found in clipboard. Try copying an image or use the Image button.");
+    } catch (err) {
+      setError("Clipboard access was blocked by the browser. Use Ctrl+V inside the text box or tap Image.");
     }
   };
 
@@ -2585,16 +2717,22 @@ function App() {
                       <FormattingToolbar
                         onFormat={applyFormat}
                         onUploadImage={handleUploadLessonImage}
+                        onPasteImage={handlePasteImageFromClipboard}
                         imageUploading={imageUploading}
+                        onUndo={handleUndo}
+                        onRedo={handleRedo}
+                        canUndo={historyStatus.canUndo}
+                        canRedo={historyStatus.canRedo}
                         onStandardize={() => {
                           if (!content.trim()) return;
+                          pushEditorHistory(content, false);
                           const formatted = smartFormatAcademicText(content);
                           setContent(formatted);
                           const derived = cleanTitle(lessonTitle, content);
                           if (derived && derived !== lessonTitle) {
                             setLessonTitle(derived);
                           }
-                          setToast("Formatted into academic courseware style!");
+                          setNotice("Formatted into academic courseware style!");
                         }}
                         activeFormat={formattingActive}
                         linkDialog={linkDialog}
@@ -2617,6 +2755,7 @@ function App() {
                         className="studio-textarea"
                         value={content}
                         onChange={(event) => {
+                          pushEditorHistory(content, true);
                           setContent(event.target.value);
                           handleEditorSelectionChange();
                         }}
@@ -2627,6 +2766,38 @@ function App() {
                         onKeyUp={handleEditorSelectionChange}
                         placeholder="Write formatted lesson. Use ## headings, lists, > quotes, and ``` code blocks..."
                       />
+                      {(() => {
+                        const imgs = [...(content || "").matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)].map((m, idx) => ({
+                          raw: m[0],
+                          alt: m[1] || `Image ${idx + 1}`,
+                          url: m[2],
+                        }));
+                        if (!imgs.length) return null;
+                        return (
+                          <div className="editor-image-strip">
+                            <span className="editor-image-strip-label">Attached Images ({imgs.length}):</span>
+                            <div className="editor-image-strip-list">
+                              {imgs.map((img, idx) => (
+                                <div key={`${img.url}-${idx}`} className="editor-image-thumb-card">
+                                  <img src={img.url} alt={img.alt} />
+                                  <button
+                                    type="button"
+                                    className="editor-image-remove-btn"
+                                    title="Remove image from lesson"
+                                    onClick={() => {
+                                      pushEditorHistory(content, false);
+                                      const next = content.replace(img.raw, "").replace(/\n{3,}/g, "\n\n").trim();
+                                      setContent(next);
+                                    }}
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
 

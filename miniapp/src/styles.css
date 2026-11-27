@@ -3644,6 +3644,65 @@ input:checked + .slider:before {
   min-height: 100%;
 }
 
+.editor-image-strip {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.editor-image-strip-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-weak);
+  margin-bottom: 6px;
+}
+
+.editor-image-strip-list {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.editor-image-thumb-card {
+  position: relative;
+  width: 68px;
+  height: 52px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface-hover);
+}
+
+.editor-image-thumb-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.editor-image-remove-btn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.72);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
 .pdf-image-figure {
   margin: 18px auto;
   text-align: center;
