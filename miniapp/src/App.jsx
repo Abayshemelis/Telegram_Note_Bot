@@ -371,12 +371,21 @@ function App() {
     setQuizPreviewOpen(false);
   }, []);
 
+  const resetEditorTransientState = useCallback(() => {
+    editorHistoryRef.current = { past: [], future: [], lastTypedAt: 0 };
+    setHistoryStatus({ canUndo: false, canRedo: false });
+    lastCursorRef.current = { start: 0, end: 0 };
+    setFormattingActive(null);
+    setLinkDialog(null);
+  }, []);
+
   const loadLesson = useCallback(async (id) => {
     if (!id) return;
     const [data, history] = await Promise.all([
       api(`/api/lessons/${id}`),
       api(`/api/lessons/${id}/versions`),
     ]);
+    resetEditorTransientState();
     setLesson(data);
     setLessonTitle(data.title ?? "");
     setSourceContent(data.source_content ?? "");
@@ -384,7 +393,7 @@ function App() {
     setVersions(history ?? []);
     setPreview([]);
     setEditingCourse(false);
-  }, []);
+  }, [resetEditorTransientState]);
 
   const confirmAction = useCallback(
     ({
@@ -621,6 +630,10 @@ function App() {
 
   useEffect(() => {
     setLesson(null);
+    setLessonTitle("");
+    setSourceContent("");
+    setContent("");
+    resetEditorTransientState();
     setLessons([]);
     setPreview([]);
     if (courseId) {
@@ -2766,6 +2779,7 @@ function App() {
                         }}
                       />
                       <textarea
+                        key={`draft-${lesson?.id ?? "none"}`}
                         ref={contentRef}
                         className="studio-textarea"
                         value={content}
@@ -2791,7 +2805,7 @@ function App() {
                         }));
                         if (!imgs.length) return null;
                         return (
-                          <div className="editor-image-strip">
+                          <div key={`imgs-${lesson?.id ?? "none"}`} className="editor-image-strip">
                             <span className="editor-image-strip-label">Attached Images ({imgs.length}):</span>
                             <div className="editor-image-strip-list">
                               {imgs.map((img, idx) => (
