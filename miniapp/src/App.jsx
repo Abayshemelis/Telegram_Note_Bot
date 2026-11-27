@@ -97,7 +97,7 @@ export function isInsideTelegram() {
 
 async function api(path, options = {}) {
   const initData = getTelegramInitData();
-  const { timeoutMs = 10000, ...fetchOptions } = options;
+  const { timeoutMs = 30000, ...fetchOptions } = options;
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -122,7 +122,7 @@ async function api(path, options = {}) {
   } catch (err) {
     clearTimeout(timeoutId);
     if (err.name === "AbortError") {
-      throw new Error("Connection timed out. Check that the backend server (notes_bot.web) is running on port 8000.");
+      throw new Error("Request timed out. The server may be waking up — please try again in a moment.");
     }
     throw err;
   }
