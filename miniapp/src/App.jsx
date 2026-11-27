@@ -1532,16 +1532,6 @@ function App() {
             >
               ↻ Retry Connection
             </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => {
-                setLessonError(null);
-                enableDemoMode();
-              }}
-            >
-              ✦ Sample Reader Preview
-            </button>
           </div>
         </div>
       </main>
@@ -1567,22 +1557,23 @@ function App() {
               window.location.hash = "";
             }
           }}
-          onOpenStudio={() => {
-            setPublicLesson(null);
-            if (typeof window !== "undefined") {
-              window.location.hash = "";
-            }
-            if (!admin) {
-              enableDemoMode();
-            }
-          }}
+          onOpenStudio={
+            admin
+              ? () => {
+                  setPublicLesson(null);
+                  if (typeof window !== "undefined") {
+                    window.location.hash = "";
+                  }
+                }
+              : null
+          }
         />
       </main>
     );
   }
 
   if (!admin) {
-    return <AuthScreen error={error} onEnableDemoMode={enableDemoMode} />;
+    return <AuthScreen error={error} />;
   }
 
   const isFullWidthView = ["courses", "calendar", "publishing", "settings"].includes(viewMode);
