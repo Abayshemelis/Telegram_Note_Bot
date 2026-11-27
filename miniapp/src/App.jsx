@@ -1815,9 +1815,23 @@ function App() {
           return;
         }
       }
-      setError("No image found in clipboard. Try copying an image or use the Image button.");
-    } catch (err) {
-      setError("Clipboard access was blocked by the browser. Use Ctrl+V inside the text box or tap Image.");
+      setNotice("No image found in clipboard. Long-press inside the text box and tap Paste, or tap Image.");
+    } catch {
+      const tg = window.Telegram?.WebApp;
+      if (typeof tg?.readTextFromClipboard === "function") {
+        tg.readTextFromClipboard(async (clipText) => {
+          const txt = (clipText || "").trim();
+          if (/^https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?$/i.test(txt)) {
+            await handleImportImageUrl(txt);
+            return;
+          }
+          contentRef.current?.focus();
+          setNotice("Telegram blocks button-paste for images. Long-press inside the text box and tap Paste, or tap Image.");
+        });
+        return;
+      }
+      contentRef.current?.focus();
+      setNotice("Browser blocked button-paste. Press Ctrl+V (or long-press → Paste) inside the text box, or tap Image.");
     }
   };
 
