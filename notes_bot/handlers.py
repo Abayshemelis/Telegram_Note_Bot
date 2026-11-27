@@ -131,6 +131,12 @@ def format_note_content(content: str) -> list[tuple[str, str]]:
             blocks.append(("bullet", bullet.group(1)))
             continue
 
+        img_match = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)$", stripped)
+        if img_match:
+            alt = img_match.group(1).strip() or "Explanation diagram"
+            blocks.append(("image", alt))
+            continue
+
         blocks.append(("paragraph", line))
 
     if code_lines:
@@ -216,6 +222,9 @@ def _format_content_blocks(content: str) -> list[str]:
     section_number = 0
     for kind, text in format_note_content(content):
         if kind == "spacer":
+            continue
+        if kind == "image":
+            rendered.append(f"🖼️ <i>[Diagram: {escape(text, quote=False)}]</i>")
             continue
         if kind == "code":
             code_chunks = _split_text_by_escaped_length(

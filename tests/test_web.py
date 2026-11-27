@@ -43,6 +43,8 @@ def signed_init_data(user_id: int = 42, *, auth_date: int | None = None) -> str:
 class FakeDatabase:
     def __init__(self) -> None:
         self.finish_calls = []
+        self.images: dict[int, dict] = {}
+        self.next_image_id = 1
         self.lesson = {
             "id": 4,
             "title": "Ports",
@@ -399,6 +401,25 @@ class FakeDatabase:
                 g["accepted_at"] = "2026-11-21T09:05:00+00:00"
                 return g
         return None
+
+
+    def miniapp_create_image(self, lesson_id, file_name, mime_type, data):
+        img_id = self.next_image_id
+        self.next_image_id += 1
+        row = {
+            "id": img_id,
+            "lesson_id": lesson_id,
+            "file_name": file_name,
+            "mime_type": mime_type,
+            "file_size": len(data),
+            "data": data,
+            "url": f"/api/images/{img_id}",
+        }
+        self.images[img_id] = row
+        return {k: v for k, v in row.items() if k != "data"}
+
+    def miniapp_get_image(self, image_id):
+        return self.images.get(image_id)
 
 
 class FakeBot:
@@ -1441,6 +1462,47 @@ class MiniAppApiTests(unittest.TestCase):
         self.assertEqual(data3["ai_provider"], "groq")
         self.assertEqual(data3["ai_provider_api_key"], "gsk_groq_saved_key_abc123")
         self.assertEqual(data3["gemini_api_key"], "AQ.gemini_saved_key_xyz789")
+
+
+    def test_upload_and_fetch_lesson_image(self) -> None:
+        import base64
+
+        png_bytes = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        b64 = base64.b64encode(png_bytes).decode("ascii")
+        res = self.client.post(
+            "/api/images",
+            json={
+                "lesson_id": 4,
+                "file_name": "diagram.png",
+                "mime_type": "image/png",
+                "data_base64": f"data:image/png;base64,{b64}",
+            },
+            headers=self.headers,
+        )
+        self.assertEqual(res.status_code, 201)
+        payload = res.json()
+        self.assertEqual(payload["url"], "/api/images/1")
+
+        # Public GET works without admin header
+        get_res = self.client.get("/api/images/1")
+        self.assertEqual(get_res.status_code, 200)
+        self.assertEqual(get_res.content, png_bytes)
+
+    def test_browser_admin_token_auth(self) -> None:
+        from notes_bot.web import create_browser_admin_token
+
+        admin_id = next(iter(ADMIN_IDS))
+        token = create_browser_admin_token(
+            BOT_TOKEN, admin_id, "Abay", "abay_admin"
+        )
+        res = self.client.get("/api/me", headers={"X-Admin-Token": token})
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json()["id"], admin_id)
+
+        # Non-admin user ID is rejected even if validly signed
+        bad_token = create_browser_admin_token(BOT_TOKEN, 999, "Student", "stu")
+        bad_res = self.client.get("/api/me", headers={"X-Admin-Token": bad_token})
+        self.assertEqual(bad_res.status_code, 403)
 
 
 if __name__ == "__main__":

@@ -1290,6 +1290,16 @@ def create_app(
                         chat_id=channel_id, text=part, parse_mode="HTML"
                     )
                     message_ids.append(sent.message_id)
+                if hasattr(telegram_bot, "send_photo"):
+                    for img_id_str in re.findall(r"/api/images/(\d+)", approved["content"]):
+                        img_row = await db_call("miniapp_get_image", int(img_id_str))
+                        if img_row and img_row.get("data"):
+                            sent_photo = await telegram_bot.send_photo(
+                                chat_id=channel_id,
+                                photo=img_row["data"],
+                                caption=f"🖼️ {approved['title'][:180]}",
+                            )
+                            message_ids.append(sent_photo.message_id)
             else:
                 # Default "card" mode: 1 clean channel announcement card + interactive reader link
                 summary = extract_summary(approved["content"])
