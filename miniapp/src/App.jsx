@@ -97,16 +97,17 @@ export function isInsideTelegram() {
 
 async function api(path, options = {}) {
   const initData = getTelegramInitData();
+  const { timeoutMs = 10000, ...fetchOptions } = options;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(path, {
       signal: controller.signal,
-      ...options,
+      ...fetchOptions,
       headers: {
         "Content-Type": "application/json",
         "X-Telegram-Init-Data": initData,
-        ...options.headers,
+        ...fetchOptions.headers,
       },
     });
     clearTimeout(timeoutId);
@@ -1579,6 +1580,19 @@ function App() {
   const isFullWidthView = ["courses", "calendar", "publishing", "settings"].includes(viewMode);
   const inTelegram = isInsideTelegram();
 
+  const insertImageMarkdownAtCursor = (imageUrl) => {
+    const textarea = contentRef.current;
+    const currentVal = textarea ? textarea.value : content;
+    const start = textarea ? textarea.selectionStart : currentVal.length;
+    const end = textarea ? textarea.selectionEnd : currentVal.length;
+    const prefix = start > 0 && currentVal[start - 1] !== "\n" ? "\n\n" : "";
+    const suffix = end < currentVal.length && currentVal[end] !== "\n" ? "\n\n" : "\n";
+    const snippet = `${prefix}![Explanation image](${imageUrl})${suffix}`;
+    const nextVal = currentVal.slice(0, start) + snippet + currentVal.slice(end);
+    const nextCursor = start + snippet.length;
+    updateEditorContent(nextVal, nextCursor, nextCursor);
+  };
+
   const encodeImageForUpload = async (file) => {
     const readAsDataUrl = (blob) =>
       new Promise((resolve, reject) => {
@@ -1589,13 +1603,14 @@ function App() {
       });
 
     const rawDataUrl = await readAsDataUrl(file);
-    const mime = file.type || "image/png";
-    // Keep small images or animated GIFs as-is
-    if (mime === "image/gif" || file.size <= 350_000) {
+    const mime = (file.type || "").toLowerCase();
+    const supportedDirect = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+    // Keep small standard images or animated GIFs as-is
+    if ((mime === "image/gif" || (supportedDirect.has(mime) && file.size <= 350_000))) {
       return { mimeType: mime, dataBase64: rawDataUrl };
     }
 
-    // Resize/compress larger photos or screenshots to keep database lean
+    // Resize/compress or convert non-standard formats (heic, bmp, avif, empty mime) via canvas
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -1610,7 +1625,7 @@ function App() {
         canvas.height = height;
         const ctx = canvas.getContext("2d");
         if (!ctx) {
-          resolve({ mimeType: mime, dataBase64: rawDataUrl });
+          resolve({ mimeType: supportedDirect.has(mime) ? mime : "image/png", dataBase64: rawDataUrl });
           return;
         }
         ctx.drawImage(img, 0, 0, width, height);
@@ -1618,7 +1633,7 @@ function App() {
         const compressed = canvas.toDataURL(targetMime, 0.85);
         resolve({ mimeType: targetMime, dataBase64: compressed });
       };
-      img.onerror = () => resolve({ mimeType: mime, dataBase64: rawDataUrl });
+      img.onerror = () => resolve({ mimeType: supportedDirect.has(mime) ? mime : "image/png", dataBase64: rawDataUrl });
       img.src = rawDataUrl;
     });
   };
@@ -1631,6 +1646,7 @@ function App() {
       const { mimeType, dataBase64 } = await encodeImageForUpload(file);
       const uploaded = await api("/api/images", {
         method: "POST",
+        timeoutMs: 30000,
         body: JSON.stringify({
           lesson_id: lesson?.id ?? null,
           file_name: file.name || "pasted-image.png",
@@ -1638,19 +1654,33 @@ function App() {
           data_base64: dataBase64,
         }),
       });
-      const textarea = contentRef.current;
-      const currentVal = textarea ? textarea.value : content;
-      const start = textarea ? textarea.selectionStart : currentVal.length;
-      const end = textarea ? textarea.selectionEnd : currentVal.length;
-      const prefix = start > 0 && currentVal[start - 1] !== "\n" ? "\n\n" : "";
-      const suffix = end < currentVal.length && currentVal[end] !== "\n" ? "\n\n" : "\n";
-      const snippet = `${prefix}![Explanation image](${uploaded.url})${suffix}`;
-      const nextVal = currentVal.slice(0, start) + snippet + currentVal.slice(end);
-      const nextCursor = start + snippet.length;
-      updateEditorContent(nextVal, nextCursor, nextCursor);
+      insertImageMarkdownAtCursor(uploaded.url);
       setNotice("Image added to lesson!");
     } catch (err) {
       setError(err.message || "Failed to upload image.");
+    } finally {
+      setImageUploading(false);
+    }
+  };
+
+  const handleImportImageUrl = async (url) => {
+    setImageUploading(true);
+    setError("");
+    try {
+      const uploaded = await api("/api/images/from-url", {
+        method: "POST",
+        timeoutMs: 25000,
+        body: JSON.stringify({
+          lesson_id: lesson?.id ?? null,
+          url,
+        }),
+      });
+      insertImageMarkdownAtCursor(uploaded.url);
+      setNotice("Image copied and saved to lesson!");
+    } catch {
+      // Fallback to direct markdown image link if remote host blocks server fetch
+      insertImageMarkdownAtCursor(url);
+      setNotice("Image link added to lesson!");
     } finally {
       setImageUploading(false);
     }
@@ -1660,7 +1690,7 @@ function App() {
     const clipboard = event.clipboardData;
     if (!clipboard) return;
 
-    // 1. Check direct image items/files in clipboard (screenshots, Copy Image from browser, etc.)
+    // 1. Direct image items/files in clipboard (screenshots, Copy Image from browser, etc.)
     const items = Array.from(clipboard.items || []);
     const imageItem = items.find((item) => item.kind === "file" && item.type.startsWith("image/"));
     if (imageItem) {
@@ -1673,14 +1703,14 @@ function App() {
     }
 
     const files = Array.from(clipboard.files || []);
-    const imageFile = files.find((f) => f.type.startsWith("image/"));
+    const imageFile = files.find((f) => f.type.startsWith("image/") || /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(f.name || ""));
     if (imageFile) {
       event.preventDefault();
       await handleUploadLessonImage(imageFile);
       return;
     }
 
-    // 2. Fallback: check pasted HTML for embedded data:image/... URI
+    // 2. Pasted HTML containing <img src="data:image/..."> or <img src="https://...">
     const htmlData = clipboard.getData("text/html");
     if (htmlData) {
       const dataUriMatch = htmlData.match(/<img[^>]+src=["'](data:image\/[^"']+)["']/i);
@@ -1691,10 +1721,25 @@ function App() {
           const blob = await res.blob();
           const pastedFile = new File([blob], "pasted-image.png", { type: blob.type || "image/png" });
           await handleUploadLessonImage(pastedFile);
-        } catch (err) {
+        } catch {
           setError("Could not read pasted image from clipboard.");
         }
+        return;
       }
+
+      const remoteImgMatch = htmlData.match(/<img[^>]+src=["'](https?:\/\/[^"']+)["']/i);
+      if (remoteImgMatch && !clipboard.getData("text/plain")?.trim()) {
+        event.preventDefault();
+        await handleImportImageUrl(remoteImgMatch[1]);
+        return;
+      }
+    }
+
+    // 3. Plain-text direct image URL (e.g. Copy Image Address)
+    const plainText = (clipboard.getData("text/plain") || "").trim();
+    if (/^https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?$/i.test(plainText)) {
+      event.preventDefault();
+      await handleImportImageUrl(plainText);
     }
   };
 

@@ -230,6 +230,13 @@ class ImageUploadInput(BaseModel):
     data_base64: str = Field(min_length=1, max_length=8_000_000)
 
 
+class ImageUrlImportInput(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    lesson_id: int | None = None
+    url: str = Field(min_length=8, max_length=2048)
+
+
 class AIGenerationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1495,6 +1502,39 @@ def create_app(
             content=image["data"],
             media_type=image["mime_type"],
             headers={"Cache-Control": "public, max-age=31536000, immutable"},
+        )
+
+    @app.post("/api/images/from-url", status_code=201)
+    async def import_lesson_image_from_url(
+        payload: ImageUrlImportInput,
+        admin: dict[str, Any] = Depends(admin_user),
+    ) -> dict[str, Any]:
+        target_url = payload.url.strip()
+        if not (target_url.startswith("https://") or target_url.startswith("http://")):
+            raise HTTPException(status_code=400, detail="Only http/https image URLs are supported.")
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                resp = await client.get(target_url, headers={"User-Agent": "CyberLearnStudio/1.0"})
+                resp.raise_for_status()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Could not fetch image URL: {exc}") from exc
+
+        content_type = (resp.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+        if content_type == "image/jpg":
+            content_type = "image/jpeg"
+        allowed_mimes = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+        if content_type not in allowed_mimes:
+            raise HTTPException(status_code=400, detail="URL did not return a supported image.")
+        image_bytes = resp.content
+        if not image_bytes or len(image_bytes) > 5 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="Remote image must be under 5 MB.")
+        file_name = target_url.rsplit("/", 1)[-1].split("?")[0][:120] or "imported-image.png"
+        return await db_call(
+            "miniapp_create_image",
+            payload.lesson_id,
+            file_name,
+            content_type,
+            image_bytes,
         )
 
     # ------------------------------------------------------------------
