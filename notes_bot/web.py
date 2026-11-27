@@ -7,7 +7,6 @@ import html
 import json
 import logging
 import math
-import os
 import re
 import time
 from contextlib import asynccontextmanager
@@ -2135,9 +2134,7 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    host = os.environ.get("WEB_HOST", "0.0.0.0" if os.environ.get("PORT") else "127.0.0.1")
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run(create_app(load_config()), host=host, port=port)
+    uvicorn.run(create_app(load_config()), host="127.0.0.1", port=8000)
 
 
 if __name__ == "__main__":
